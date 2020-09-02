@@ -1,0 +1,14 @@
+.character-count {
+    margin: 5px 0;
+    line-height: 1.231em;
+    font-size: 0.923em;
+    color: #666;
+}
+
+.character-count.invalid {
+    color:red;
+}
+
+.character-count.valid {
+    color: green;
+}

@@ -1,0 +1,229 @@
+<?php
+
+/**
+ * Implements hook_menu().
+ */
+function wms_import_menu() {
+  $items = array();
+
+  $items['admin/config/system/wms_import'] = array(
+    'title'            => t('WMS Bulk Import'),
+    'description'      => t('CSV Import Processor'),
+    'page callback'    => 'drupal_get_form',
+    'page arguments'   => array('wms_import_form'),
+    'access arguments' => array('access administration pages'),
+    'type'             => MENU_NORMAL_ITEM
+  );
+  return $items;
+}
+
+/**
+ * CSV Upload Form
+ */
+function wms_import_form() {
+  $form = array();
+  drupal_set_title('Bulk Node Import');
+
+  $form['file'] = array(
+    '#type'              => 'managed_file',
+    '#title'             => t('CSV File.'),
+    '#description'       => t("CSV file for upload. Only .csv and .txt files with comma separated values will be accepted"),
+    '#size'              => 22,
+    "#upload_validators"  => array("file_validate_extensions" => array("csv txt")),
+    '#upload_location'   => 'public://csv_import/',
+  );
+
+  $form['submit'] = array(
+    '#type'  => 'submit',
+    '#value' => t('Submit'),
+  );
+
+  return $form;
+}
+
+/**
+ * Form Submission Handler
+ */
+function wms_import_form_submit($form, &$form_state) {
+  // be sure we are auto detecting the line breaks
+  ini_set('auto_detect_line_endings', TRUE);
+
+  // Include helper libraries
+  module_load_include('php', 'wms_import', 'includes/parsecsv.lib');
+  module_load_include('inc', 'wms_import', 'includes/wms_import.map');
+  module_load_include('inc', 'wms_import', 'includes/wms_import.helpers');
+
+  // Get the field map
+  $map = wms_import_map();
+
+  $file = file_load($form_state['values']['file']);
+  if ($file) {
+    // save file
+    $file->status = FILE_STATUS_PERMANENT;
+    file_save($file);
+
+    $row_count = 1;
+    $csv       = new parseCSV(drupal_realpath($file->uri));
+
+    // Determine if processing should continue
+    $should_process = true;
+
+    $operations = array();
+
+    foreach ($csv->data as $row) {
+      $data = array();
+      foreach ($row as $item) {
+        $data[] = $item;
+      }
+      if (count($data) != count($map)) {
+        drupal_set_message(t('CSV file row @row_count has incorrect number of columns.  @columns exist.', array(
+          '@row_count' => $row_count,
+          '@columns'   => count($data)
+        )), 'error');
+      }
+      else {
+        // if first item is Title then it's a header row, so we'll skip it
+        if ($data[0] != 'Title') {
+          $passed = TRUE;
+
+          if (!wms_import_validate_utf8($data)) {
+            $passed = false;
+            $should_process = false;
+            drupal_set_message(t('CSV file row @row_count (@title) contains invalid character set. Please convert to UTF8.', array('@row_count'=>$row_count, '@title'=>$data[0])), 'error');
+          }
+
+          if ($passed) {
+            $operations[] = array('wms_import_batch_processing', array($data));
+          }
+        }
+      }
+      $row_count++;
+    }
+
+    if (!$should_process) {
+      return;
+    }
+
+    if (count($operations) > 0) {
+      $batch = array(
+        'title'            => t('Importing CSV...'),
+        'operations'       => $operations,
+        'finished'         => 'wms_import_finished',
+        'error_message'    => t('The CSV process has encountered an error.'),
+        'progress_message' => t('Imported @current of @total Nodes.'),
+      );
+      batch_set($batch);
+      drupal_set_message(t('The file has been uploaded and nodes have been processed, filename: @filename.', array('@filename' => $file->filename)));
+    }
+    else {
+      drupal_set_message(t('No valid records in file: @filename.', array('@filename' => $file->filename)), 'error');
+    }
+  }
+  else {
+    drupal_set_message(t('CSV file could not be loaded.'), 'error');
+  }
+}
+
+/**
+ *
+ * Batch processing function that is executed for each item
+ *
+ * @param $data
+ */
+function wms_import_batch_processing($data) {
+  // Include helper libraries
+  module_load_include('inc', 'wms_import', 'includes/wms_import.map');
+  module_load_include('inc', 'wms_import', 'includes/wms_import.helpers');
+
+  try {
+    global $user;
+    $title = $data[0];
+
+    $node = new stdClass();
+    $node->type = 'wish';
+    $node->created = date("Y-m-d h:m:s",time());
+    $node->title = $title;
+    $node->language = LANGUAGE_NONE;
+    $node->uid = $user->uid;
+    node_object_prepare($node);
+
+    // Get the field map
+    $map = wms_import_map();
+
+    foreach($map as $column => $item) {
+      $valid = true;
+      // Apply defaults
+      if ($data[$column] == NULL || trim($data[$column]) == '') {
+        if ($item['default'] == WMS_FIELD_DEFAULT) {
+          // Currently assigning blank.  Perhaps field default in the future.
+          $data[$column] = '';
+        } else {
+          $data[$column] = $item['default'];
+        }
+      }
+
+      $field_name = $item['field'];
+      $field = field_info_field($field_name);
+
+      if ($field) {
+        switch($field['type']) {
+          case 'entityreference':
+            $key = 'target_id';
+            $data[$column] = 0;
+            break;
+          case 'link_field':
+            $key = 'url';
+            break;
+          case 'email':
+            $key = 'email';
+            break;
+          case 'name':
+            $key = $item['key'];
+            break;
+          case 'number_float':
+            if (!is_numeric($data[$column])) {
+              $data[$column] = 0;
+            }
+            break;
+          case 'datetime':
+            if ($data[$column] && trim($data[$column]) != '') {
+              $data[$column] = date("Y-m-d h:m:s", strtotime($data[$column]));
+            } else {
+              $valid = false;
+            }
+          case 'phone':
+          default:
+            $key = 'value';
+            break;
+        }
+
+        if (isset($field['settings'])) {
+          if (isset($field['settings']['max_length'])) {
+            $max = $field['settings']['max_length'];
+            if (strlen($data[$column]) > $max) {
+              $data[$column] = substr($data[$column], 0, $max);
+            }
+          }
+        }
+
+        if ($valid === true) {
+          $node->{$field_name}[LANGUAGE_NONE][0][$key] = trim($data[$column]);
+        }
+      }
+    }
+
+    node_save($node);
+  } catch (Exception $e) {
+    drupal_set_message(t('<pre>Error saving ' . $data[0] . '</pre>' . $e->getMessage()), 'error');
+  }
+}
+
+/**
+ *
+ * Batch completion handler
+ *
+ * @param $data
+ */
+function wms_import_finished($data) {
+  drupal_set_message(t('Node Import Complete'));
+}

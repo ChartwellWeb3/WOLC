@@ -1,0 +1,5 @@
+name = WMS Importer
+description = Handles node creation on CSV import
+package = WMS
+version = VERSION
+core = 7.x

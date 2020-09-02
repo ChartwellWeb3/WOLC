@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="PhpIncludePathManager">
+    <include_path>
+      <path value="." />
+      <path value="/Applications/XAMPP/xamppfiles/lib/php" />
+      <path value="$USER_HOME$/Google Drive/Repositories-Macbook-Air/SaaSPerts/WMS/includes" />
+      <path value="$USER_HOME$/Google Drive/Repositories-Macbook-Air/SaaSPerts/WMS/modules" />
+      <path value="$USER_HOME$/Google Drive/Repositories-Macbook-Air/SaaSPerts/WMS/sites/all/modules" />
+    </include_path>
+  </component>
+</project>

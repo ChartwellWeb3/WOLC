@@ -1,0 +1,5 @@
+name = WMS
+description = Custom WMS Functionality
+package = WMS
+version = VERSION
+core = 7.x

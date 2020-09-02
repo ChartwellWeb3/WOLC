@@ -1,0 +1,552 @@
+<?php
+
+/**
+ * Simpple function to get current lanaguage 
+ */
+
+function wms_app_lang() {
+  global $language;
+  $lang = $language->language;
+  //watchdog('wms_lang2', $lang);
+  return $lang;
+}
+
+function wms_app_init() {
+  drupal_add_css(drupal_get_path('module', 'wms_app') . '/css/wms_app.css');
+  $lang = wms_app_lang();
+  if ($lang == 'fr') {
+  drupal_add_js(drupal_get_path('module', 'jquery_ui') . '../../jquery_ui/jquery.ui/ui/i18n/ui.datepicker-fr.js');
+  drupal_add_js(drupal_get_path('module', 'wms_app') . '/js/wms_app_fr.js');
+  } else {
+  drupal_add_js(drupal_get_path('module', 'wms_app') . '/js/wms_app.js');  
+  }
+}
+
+/**
+ * Implements wms_menu().
+ */
+function wms_app_menu(){
+  $items = array();
+
+  $items['admin/config/system/wms'] = array(
+    'title' => t('WMS Settings'),
+    'description' => t('Custom settings for WMS'),
+    'type' => MENU_NORMAL_ITEM,
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('wms_app_admin_form'),
+    'file' => 'includes/wms.admin.inc',
+    'access arguments' => array('access administration pages'),
+  );
+
+  $items['node/add/wish/iframe'] = array(
+    'type' => MENU_NORMAL_ITEM,
+    'page callback' => 'wms_iframe_wish_form',
+    'access callback' => TRUE,
+  );
+
+  $items['node/add/wish/iframe/success'] = array(
+    'type' => MENU_CALLBACK,
+    'page callback' => 'wms_iframe_wish_form_success',
+    'access callback' => TRUE,
+  );
+  
+    $items['node/add/wish-fr/iframe'] = array(
+    'type' => MENU_NORMAL_ITEM,
+    'page callback' => 'wms_iframe_french_wish_form',
+    'access callback' => TRUE,
+  );
+
+  $items['node/add/wish-fr/iframe/success'] = array(
+    'type' => MENU_CALLBACK,
+    'page callback' => 'wms_iframe_french_wish_form_success',
+    'access callback' => TRUE,
+  );
+
+  return $items;
+}
+
+/**
+ *
+ * Page Callback:  Displays the Wish node form
+ *
+ * @return string
+ */
+function wms_iframe_wish_form() {
+  module_load_include('inc', 'node', 'node.pages');
+  global $user;
+  $node           = new StdClass();
+  $node->uid      = $user->uid;
+  $node->name     = isset($user->name) ? $user->name : '';
+  $node->type     = 'wish';
+  $node->language = '';
+  node_object_prepare($node);
+
+  $form   = drupal_get_form('wish_node_form', $node);
+  $output = drupal_render($form);
+
+  return $output;
+}
+
+/**
+ *
+ * Page Callback:  Displays the French Wish node form
+ *
+ * @return string
+ */
+function wms_iframe_french_wish_form() {
+  module_load_include('inc', 'node', 'node.pages');
+  global $user;
+  $node           = new StdClass();
+  $node->uid      = $user->uid;
+  $node->name     = isset($user->name) ? $user->name : '';
+  $node->type     = 'wish_fr';
+  $node->language = '';
+  node_object_prepare($node);
+
+  $form   = drupal_get_form('wish_fr_node_form', $node);
+  $output = drupal_render($form);
+
+  return $output;
+}
+
+/**
+ *
+ * Page Callback:  Displays a success page
+ *
+ * @return string
+ */
+function wms_iframe_wish_form_success() {
+  return ' ';
+}
+
+/**
+ *
+ * Page Callback:  Displays a success page
+ *
+ * @return string
+ */
+function wms_iframe_french_wish_form_success() {
+  return ' ';
+}
+
+/**
+ * Implements hook_permission().
+ */
+function wms_app_permission() {
+  return array(
+    'administer wish status' => array(
+      'title' => t('Administer wish status'),
+      'description' => t('Perform administration tasks for my module.'),
+    ),
+  );
+}
+
+function wms_app_logged_in_true_false(){
+    if (user_is_logged_in()){
+        return 'true';
+    } else{
+        return 'false';
+    }
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function wms_app_form_alter(&$form, &$form_state, $form_id) {
+
+//Qualifications are the same for all wish types
+
+  $status_options = array(
+    'Qualification' => array('Qualification'=>'Qualification', 'Vetting'=>'Vetting', 'Not Granting'=>'Not Granting', 'Does Not Qualify'=>'Does Not Qualify'),
+    'Vetting' => array('Vetting'=>'Vetting', 'Validation'=>'Validation', 'On Hold'=>'On Hold', 'Not Granting'=>'Not Granting'),
+    'Validation' => array('Validation'=>'Validation', 'Execution'=>'Execution', 'On Hold'=>'On Hold', 'Not Granting'=>'Not Granting'),
+    'Execution' => array('Execution'=>'Execution', 'Scheduled'=>'Scheduled', 'On Hold'=>'On Hold', 'Not Granting'=>'Not Granting'),
+    'Close-Out' => array('Close-Out'=>'Close-Out', 'Granted'=>'Granted'),
+    'On Hold' => array('On Hold'=>'On Hold', 'Vetting'=>'Vetting', 'Validation'=>'Validation', 'Execution'=>'Execution', 'Scheduled'=>'Scheduled', 'Not Granting'=>'Not Granting'),
+    'Not Granting' => array('Not Granting'=>'Not Granting'),
+    'Does Not Qualify' => array('Does Not Qualify'=>'Does Not Qualify'),
+    'Granted' => array('Granted'=>'Granted'),
+    'Scheduled' => array ('Scheduled'=>'Scheduled', 'Execution'=>'Execution', 'Not Granting'=>'Not Granting', 'On Hold'=>'On Hold', 'Close-Out'=>'Close-Out', 'Granted'=>'Granted'),
+    'Other' => array ('Other'=>'Other','Qualification'=>'Qualification', 'Vetting'=>'Vetting', 'Execution'=>'Execution', 'Close-Out'=>'Close-Out', 'On Hold'=>'On Hold', 'Not Granting'=>'Not Granting','Does Not Qualify'=>'Does Not Qualify', 'Granted'=>'Granted'),
+    'In Process (See Stage)' => array ('In Process (See Stage)' => 'In Process (See Stage)','Qualification'=>'Qualification', 'Vetting'=>'Vetting', 'Execution'=>'Execution', 'Close-Out'=>'Close-Out', 'On Hold'=>'On Hold', 'Not Granting'=>'Not Granting', 'Does Not Qualify'=>'Does Not Qualify', 'Granted'=>'Granted'),
+  );
+
+  // If the user cannot modify all status, filter
+  if (!user_access('administer wish status')) {
+    $node = $form['#node'];
+    if (isset($node->nid)) {
+      // Existing Node
+      $status = $node->field_status[LANGUAGE_NONE][0]['value'];
+      $form['field_status'][LANGUAGE_NONE]['#options'] = $status_options[$status];
+    } else {
+      $form['field_status'][LANGUAGE_NONE]['#options'] = array('Qualification'=>'Qualification');
+    }
+  }
+  
+  // Hide the age field since it will be calculated
+  $form['field_age']['#access'] = FALSE;
+
+  // Hide the revision information if not logged in.
+  $form['revision_information']['#access'] = user_is_logged_in();
+  
+  if ($form_id == 'wish_node_form') {
+
+      // Change the page title to eliminiate "Create"
+      drupal_set_title(t('Wish Application'));
+
+      // Add pre-questions text
+      $form['field_what_were_your_past_occupa']['#prefix'] = variable_get('wms_pre_question_text', '');
+
+      // Add pre-submit text
+      $form['actions']['submit']['#prefix'] = variable_get('wms_pre_submit_text', '');
+
+      // Check if we should redirect after submission
+      if (isset($_GET['q']) && $_GET['q'] == 'node/add/wish/iframe') {
+        $form_state['should_redirect'] = TRUE;
+        // Add submit handler
+        $form['actions']['submit']['#submit'][] = 'wms_app_wish_node_form_submit';
+      } else {
+        $form_state['should_redirect'] = FALSE;
+      }
+
+      // Add submit handler
+      $form['#submit'][] = 'wms_app_wish_node_form_submit';
+  }
+  if ($form_id == 'wish_fr_node_form') {
+    
+    // Change the page title to eliminiate "Create"
+    drupal_set_title(t('Demande de réalisation d’un Rêve'));
+    
+    // Add pre-questions text
+    $form['field_what_were_your_past_occupa']['#prefix'] = variable_get('wms_pre_question_text_fr', '');
+    
+    // Add pre-submit text
+    $form['actions']['submit']['#prefix'] = variable_get('wms_pre_submit_text_fr', '');
+
+    // Check if we should redirect after submission
+    if (isset($_GET['q']) && $_GET['q'] == 'node/add/wish-fr/iframe') {
+      $form_state['should_redirect'] = TRUE;
+      // Add submit handler
+      $form['actions']['submit']['#submit'][] = 'wms_app_wish_fr_node_form_submit';
+    } else {
+      $form_state['should_redirect'] = FALSE;
+    }
+
+    // Add submit handler
+    $form['#submit'][] = 'wms_app_wish_fr_node_form_submit';
+    
+
+    $form['group_english_fields']['#access'] = user_is_logged_in();
+    $form['field_name']['#access'] = user_is_logged_in();
+    $form['field_gender']['#access'] = user_is_logged_in();
+    $form['field_state']['#access'] = user_is_logged_in();
+    $form['field_nom_state']['#access'] = user_is_logged_in();
+    $form['field_country']['#access'] = user_is_logged_in();
+    $form['field_nom_country']['#access'] = user_is_logged_in();
+    $form['field_have_you_ever_been_convict']['#access'] = user_is_logged_in();
+    $form['field_are_you_a_legal_resident_o']['#access'] = user_is_logged_in();
+    $form['field_are_there_any_physical_or_']['#access'] = user_is_logged_in();
+    $form['field_are_you_a_military_veteran']['#access'] = user_is_logged_in();
+    $form['field_have_you_done_this_before1']['#access'] = user_is_logged_in();
+  }
+}
+
+/**
+ * Implements hook_theme().
+ */
+function wms_app_theme() {
+  return array(
+    'wms_add_wish_html' =>  array(
+      'template' => 'templates/wms-add-wish-form-html',
+      'render element' => 'html'
+    ),
+    'wms_add_wish_page' =>  array(
+      'template' => 'templates/wms-add-wish-form-page',
+      'render element' => 'page'
+    ),
+  );
+}
+
+/**
+ * Implements hook_preprocess_HOOK().
+ */
+function wms_app_preprocess_page(&$variables) {
+  if (isset($_GET['q']) && ($_GET['q'] == 'node/add/wish/iframe' || $_GET['q'] == 'node/add/wish/iframe/success')) {
+    $variables['theme_hook_suggestions'][] = 'wms_add_wish_page';
+  }
+  
+  //Check French path
+ 
+  if (isset($_GET['q']) && ($_GET['q'] == 'node/add/wish-fr/iframe' || $_GET['q'] == 'node/add/wish-fr/iframe/success')) {
+    $variables['theme_hook_suggestions'][] = 'wms_add_wish_page';
+  }
+
+}
+
+
+/**
+ * Implements hook_preprocess_HOOK().
+ */
+function wms_app_preprocess_html(&$variables) {
+  if (isset($_GET['q']) && ($_GET['q'] == 'node/add/wish/iframe' || $_GET['q'] == 'node/add/wish/iframe/success')) {
+    $variables['theme_hook_suggestions'][] = 'wms_add_wish_html';
+  }
+
+//Check French path
+  if (isset($_GET['q']) && ($_GET['q'] == 'node/add/wish-fr/iframe' || $_GET['q'] == 'node/add/wish-fr/iframe/success')) {
+    $variables['theme_hook_suggestions'][] = 'wms_add_wish_html';
+  }
+}
+
+/**
+ * Wish Node Form Submit Handler
+ */
+function wms_app_wish_node_form_submit($form, &$form_state) {
+  
+  //Proccess the age calculation 
+  // Get birthdate from submitted value (we are assuming it's already valid)
+  $birthdate = $form_state['values']['field_birthdate'][LANGUAGE_NONE][0]['value'];
+
+  // Convert birthdate to UNIX time
+  $birthdate_time = strtotime($birthdate);
+
+  // Get current UNIX time
+  $now = time();
+
+  // Convert timestamps to years and subtract them for age
+  $diff = abs($now - $birthdate_time);
+  $years = floor($diff / (365*60*60*24));
+
+  // Set the age field value
+  $form_state['values']['field_age'][LANGUAGE_NONE][0]['value'] = $years;
+
+  // Set custom submission success message
+  $message = variable_get('wms_submission_success_text', '');
+  if ($message != '') {
+    drupal_set_message($message, 'status', FALSE);
+  }
+
+  // If we are displaying in an iframe, change the redirect
+  if ($form_state['should_redirect']) {
+    $form_state['redirect'] = 'node/add/wish/iframe/success';
+  }
+}
+
+/**
+ * French Wish Node Form Submit Handler
+ */
+
+function wms_app_wish_fr_node_form_submit($form, &$form_state) {
+  
+  //Proccess the age calculation
+  // Get birthdate from submitted value (we are assuming it's already valid)
+  $birthdate = $form_state['values']['field_birthdate'][LANGUAGE_NONE][0]['value'];
+
+  // Convert birthdate to UNIX time
+  $birthdate_time = strtotime($birthdate);
+
+  // Get current UNIX time
+  $now = time();
+
+  // Convert timestamps to years and subtract them for age
+  $diff = abs($now - $birthdate_time);
+  $years = floor($diff / (365*60*60*24));
+
+  // Set the age field value
+  $form_state['values']['field_age'][LANGUAGE_NONE][0]['value'] = $years;
+  
+  //Copy data from from French fields to English where needed
+  
+  //Name
+  $nom_title = $form_state['values']['field_nom'][LANGUAGE_NONE][0]['title'];
+  //Translate English title to French title
+  if ($nom_title != ''){
+    switch ($nom_title) {
+      case 'M.':
+        $form_state['values']['field_name'][LANGUAGE_NONE][0]['title'] = 'Mr.';
+        break;
+      case 'Mme':
+        $form_state['values']['field_name'][LANGUAGE_NONE][0]['title'] = 'Mrs.';
+        break;
+       case 'Mlle':
+        $form_state['values']['field_name'][LANGUAGE_NONE][0]['title'] = 'Miss';
+        break;
+       case 'Dr':
+        $form_state['values']['field_name'][LANGUAGE_NONE][0]['title'] = 'Dr.';
+        break;
+       case 'Pr':
+        $form_state['values']['field_name'][LANGUAGE_NONE][0]['title'] = 'Prof.';
+        break;
+    }
+  
+  }
+  
+  $nom_given = $form_state['values']['field_nom'][LANGUAGE_NONE][0]['given'];
+  $form_state['values']['field_name'][LANGUAGE_NONE][0]['given'] = $nom_given;
+  
+  $nom_middle = $form_state['values']['field_nom'][LANGUAGE_NONE][0]['middle'];
+  if ($nom_middle !=''){
+    $form_state['values']['field_name'][LANGUAGE_NONE][0]['middle'] = $nom_middle;
+  }
+  
+  $nom_family = $form_state['values']['field_nom'][LANGUAGE_NONE][0]['family'];
+  $form_state['values']['field_name'][LANGUAGE_NONE][0]['family'] = $nom_family;
+  
+  //Gender 
+  $gender = $form_state['values']['field_gender_fr'][LANGUAGE_NONE][0]['value'];
+  if ($gender != ''){
+    if ($gender == '1' ) {
+      $form_state['values']['field_gender'][LANGUAGE_NONE][0]['value'] = 'Male';
+    } else {
+      $form_state['values']['field_gender'][LANGUAGE_NONE][0]['value'] = 'Female';
+    }
+  }
+  
+  //French Province for senior to English State or Province
+  $province = $form_state['values']['field_province'][LANGUAGE_NONE][0]['value'];
+  switch ($province) {
+    case 'Alberta':
+      $form_state['values']['field_state'][LANGUAGE_NONE][0]['value'] = 'Alberta';
+      break;
+    case 'Colombie-Britannique':
+      $form_state['values']['field_state'][LANGUAGE_NONE][0]['value'] = 'British Columbia';
+      break;
+    case 'Manitoba' :
+      $form_state['values']['field_state'][LANGUAGE_NONE][0]['value'] = 'Manitoba'; 
+      break;
+  case 'Nouveau-Brunswick':
+      $form_state['values']['field_state'][LANGUAGE_NONE][0]['value'] = 'New Brunswick';
+      break;
+  case 'Terre-Neuve-et-Labrador':
+      $form_state['values']['field_state'][LANGUAGE_NONE][0]['value'] = 'Newfoundland and Labrador';
+      break;
+  case 'Territoires du Nord-Ouest':
+      $form_state['values']['field_state'][LANGUAGE_NONE][0]['value'] = 'Northwest Territories';
+      break;
+  case 'Nouvelle-Écosse':
+      $form_state['values']['field_state'][LANGUAGE_NONE][0]['value'] = 'Nova Scotia';
+      break;
+  case 'Nunavut':
+      $form_state['values']['field_state'][LANGUAGE_NONE][0]['value'] = 'Nunavut';
+      break;
+  case 'Ontario':
+      $form_state['values']['field_state'][LANGUAGE_NONE][0]['value'] = 'Ontario';
+      break;
+  case 'Île-du-Prince-Edouard':
+      $form_state['values']['field_state'][LANGUAGE_NONE][0]['value'] = 'Prince Edward Island';
+      break;
+  case 'Québec':
+      $form_state['values']['field_state'][LANGUAGE_NONE][0]['value'] = 'Quebec';
+      break;
+  case 'Saskatchewan':
+      $form_state['values']['field_state'][LANGUAGE_NONE][0]['value'] = 'Saskatchewan';
+      break;
+  case 'Yukon':
+      $form_state['values']['field_state'][LANGUAGE_NONE][0]['value'] = 'Yukon Territory';
+      break;
+  }
+  
+  //French Province for nominator to English State or Province
+  $province = $form_state['values']['field_nom_province'][LANGUAGE_NONE][0]['value'];
+  switch ($province) {
+    case 'Alberta':
+      $form_state['values']['field_nom_state'][LANGUAGE_NONE][0]['value'] = 'Alberta';
+      break;
+    case 'Colombie-Britannique':
+      $form_state['values']['field_nom_state'][LANGUAGE_NONE][0]['value'] = 'British Columbia';
+      break;
+    case 'Manitoba' :
+      $form_state['values']['field_nom_state'][LANGUAGE_NONE][0]['value'] = 'Manitoba'; 
+      break;
+  case 'Nouveau-Brunswick':
+      $form_state['values']['field_nom_state'][LANGUAGE_NONE][0]['value'] = 'New Brunswick';
+      break;
+  case 'Terre-Neuve-et-Labrador':
+      $form_state['values']['field_nom_state'][LANGUAGE_NONE][0]['value'] = 'Newfoundland and Labrador';
+      break;
+  case 'Territoires du Nord-Ouest':
+      $form_state['values']['field_nom_state'][LANGUAGE_NONE][0]['value'] = 'Northwest Territories';
+      break;
+  case 'Nouvelle-Écosse':
+      $form_state['values']['field_nom_state'][LANGUAGE_NONE][0]['value'] = 'Nova Scotia';
+      break;
+  case 'Nunavut':
+      $form_state['values']['field_nom_state'][LANGUAGE_NONE][0]['value'] = 'Nunavut';
+      break;
+  case 'Ontario':
+      $form_state['values']['field_nom_state'][LANGUAGE_NONE][0]['value'] = 'Ontario';
+      break;
+  case 'Île-du-Prince-Edouard':
+      $form_state['values']['field_nom_state'][LANGUAGE_NONE][0]['value'] = 'Prince Edward Island';
+      break;
+  case 'Québec':
+      $form_state['values']['field_nom_state'][LANGUAGE_NONE][0]['value'] = 'Quebec';
+      break;
+  case 'Saskatchewan':
+      $form_state['values']['field_nom_state'][LANGUAGE_NONE][0]['value'] = 'Saskatchewan';
+      break;
+  case 'Yukon':
+      $form_state['values']['field_nom_state'][LANGUAGE_NONE][0]['value'] = 'Yukon Territory';
+      break;
+  }
+  
+  //Have you done this before
+  $have_you_done_this_before = $form_state['values']['field_have_you_done_this_be_fr'][LANGUAGE_NONE][0]['value'];
+  if ($gender == 'Oui' ) {
+    $form_state['values']['field_have_you_done_this_before'][LANGUAGE_NONE][0]['value'] = 'Yes';
+  } else {
+    $form_state['values']['field_have_you_done_this_before'][LANGUAGE_NONE][0]['value'] = 'No';
+  }
+
+    //Military_ Service
+  $military_service = $form_state['values']['field_military_service_fr'][LANGUAGE_NONE][0]['value'];
+  if ($military_service =! ''){
+    watchdog('WMS', print_r('<pre>' . $military_service . '</pre>'));
+    if ($military_service == '1' ) {
+      $form_state['values']['field_are_you_a_military_veteran'][LANGUAGE_NONE][0]['value'] = 'Yes';
+    if ($military_service == '2')
+      $form_state['values']['field_are_you_a_military_veteran'][LANGUAGE_NONE][0]['value'] = 'No';
+    }
+    if($military_service == '3'){
+        $form_state['values']['field_are_you_a_military_veteran'][LANGUAGE_NONE][0]['value'] = 'Unknown';
+    }
+  }
+  
+  //Citizenship
+  $citizenship = $form_state['values']['field_citizen_fr'][LANGUAGE_NONE][0]['value'];
+  if ($citizenship == 'Oui' ) {
+    $form_state['values']['field_are_you_a_legal_resident_o'][LANGUAGE_NONE][0]['value'] = 'Yes';
+  } else {
+    $form_state['values']['field_are_you_a_legal_resident_o'][LANGUAGE_NONE][0]['value'] = 'No';
+  }
+  
+  //Have you ever been convicted of a crive
+  $crime = $form_state['values']['field_crime_fr'][LANGUAGE_NONE][0]['value'];
+  if ($citizenship == 'Oui' ) {
+    $form_state['values']['field_have_you_ever_been_convict'][LANGUAGE_NONE][0]['value'] = 'Yes';
+  } else {
+    $form_state['values']['field_have_you_ever_been_convict'][LANGUAGE_NONE][0]['value'] = 'No';
+  }
+ 
+  //Have you ever been convicted of a crive
+  $limitations = $form_state['values']['field_impairments_fr'][LANGUAGE_NONE][0]['value'];
+  if ($limitations == 'Oui' ) {
+    $form_state['values']['field_are_there_any_physical_or_'][LANGUAGE_NONE][0]['value'] = 'Yes';
+  } else {
+    $form_state['values']['field_are_there_any_physical_or_'][LANGUAGE_NONE][0]['value'] = 'No';
+  } 
+
+
+
+  // Set custom submission success message
+  $message = variable_get('wms_submission_success_text_fr', '');
+  if ($message != '') {
+    drupal_set_message($message, 'status', FALSE);
+  }
+
+  // If we are displaying in an iframe, change the redirect
+  if ($form_state['should_redirect']) {
+    $form_state['redirect'] = 'node/add/wish_fr/iframe/success';
+  }
+}
+?>
